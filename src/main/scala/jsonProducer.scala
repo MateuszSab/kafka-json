@@ -1,28 +1,26 @@
-import java.util.Properties
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
 
-class jsonProducer {
+object Main extends App {
 
-  val props: Properties = new Properties()
-  props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092")
-  props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
-    "org.apache.kafka.common.serialization.StringSerializer")
-  props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
-    "org.apache.kafka.common.serialization.StringSerializer")
-  props.put("acks", "all")
+  import org.apache.spark.sql.SparkSession
 
-  val producer = new KafkaProducer[String, String](props)
-  val topic = "json_topic"
-  try {
-    for (i <- 0 to 5) {
-      val message = ???
-      val record = new ProducerRecord[String, String](topic, message, "another_topic")
+  val spark = SparkSession
+    .builder()
+    .appName("kafka json")
+    .master("local[*]")
+    .getOrCreate()
 
-    }
-  } catch {
-    case e: Exception => e.printStackTrace()
-  } finally {
-    producer.close()
-  }
+  import spark.implicits._
+  val path = "src/main/resources/data.json"
+
+  val data = spark.read.json(path)
+  data
+//    .selectExpr("to_json(struct(*)) AS value")
+    .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
+    .writeStream
+    .format("kafka")
+    .option("kafka.bootstrap.servers", ":9092")
+    .option("topic", "topic1")
+    .start()
+    .awaitTermination()
 
 }
